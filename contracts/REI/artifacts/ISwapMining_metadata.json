@@ -1,0 +1,152 @@
+{
+	"compiler": {
+		"version": "0.6.12+commit.27d51765"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "account",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "input",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "output",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					}
+				],
+				"name": "swap",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			}
+		],
+		"devdoc": {
+			"kind": "dev",
+			"methods": {},
+			"version": 1
+		},
+		"userdoc": {
+			"kind": "user",
+			"methods": {},
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"contracts/REI/OortswapRouter.sol": "ISwapMining"
+		},
+		"evmVersion": "istanbul",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": false,
+			"runs": 200
+		},
+		"remappings": []
+	},
+	"sources": {
+		"contracts/REI/OortswapRouter.sol": {
+			"keccak256": "0x976d543cc4b456f22e05d869d9bf5c73aec81899b3bc3ba41bc2ff496dbc4d21",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://321cb57e1146ef9994957fd239ca13b281eaca8b3660a35655641d3ad49d6be1",
+				"dweb:/ipfs/Qmbh914nti2nro8d1WcrwU2xJessVems9cyyqAWFs3EFtT"
+			]
+		},
+		"contracts/REI/interfaces/IERC20.sol": {
+			"keccak256": "0xe20a019cd221bca2bec984dc59ddb23063b8a54e9ac0e74e081df0315ce9cc3b",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://77b3c25c150b572f014eeb9841db68d095d3b55216f13250e5268e985993c6c6",
+				"dweb:/ipfs/QmdfXE3tdNa2Wz3R1F7ZfsgVL8zck3mDL1tsAnpJwYd2Kg"
+			]
+		},
+		"contracts/REI/interfaces/IOortswapFactory.sol": {
+			"keccak256": "0x3f75cffd3fddaa35612f1babf3c3b1abce22cc84b108a8d3dad02b1bdf356b2a",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://2ccd9f216b90c5b2378d4344aceac594cd0ac90838174a8105a591b80758552f",
+				"dweb:/ipfs/QmTsxkFF4TpH4jGutjRhk2CECQC75fjk6Tah7sZExVzdmt"
+			]
+		},
+		"contracts/REI/interfaces/IOortswapPair.sol": {
+			"keccak256": "0x604024b8ea0206c7f90f29ab26d3164d9af5751429b0030b43eab90bc4f79f25",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://9d13fa7f96cd4831848a76fec1c9ee23bc4af7f11fd68557e3e3dc43d10422e3",
+				"dweb:/ipfs/QmW2rfZ33dHseezrHQC1aKEsJiEHQ7cT5EHYYmtW2RdgQB"
+			]
+		},
+		"contracts/REI/interfaces/IOortswapRouter.sol": {
+			"keccak256": "0xa7a0f7d2ca3f10989e1c937afe205a39a154e5056582f962797048e6a426218e",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://59e07b4f19c0a2b9f5bb04a51a3cc3a97d9fcf55f6adf298712c8d75ef264a03",
+				"dweb:/ipfs/QmbHvYUe3VTCpGLW45j3p92GXjnLxMHgc7HSHSBi7sN2N7"
+			]
+		},
+		"contracts/REI/libraries/Context.sol": {
+			"keccak256": "0x4496038aa8cd303215ae6f28c92f1c3114555712f43f2b3141e199336158e756",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://e70b71484726f496ffc2689eedd2909f9784be0b69d45f86beecd2e75b502107",
+				"dweb:/ipfs/QmWNi9NcUMFMWdo2AUjDiuTxkbtt9nEvebTmYMnNFWTg7N"
+			]
+		},
+		"contracts/REI/libraries/OortLibrary.sol": {
+			"keccak256": "0x0027ce739dfe4c91aca87c4220fceda4b1278256a51b6ad30a25baf161dd1156",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://f04b3368349f3a3daedcd137bbcaf74a8779643018975b7bf345dcfdb6d81a26",
+				"dweb:/ipfs/QmZMCm7kiVCcePVMVREd881Ta4gYUsqTNzF2B6FhPpjeam"
+			]
+		},
+		"contracts/REI/libraries/Ownable.sol": {
+			"keccak256": "0x859a7eaeab1f619c8de61abe55d2d0555e65ba9ab945989d27bc94eeea0b7e62",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://20043425ea7b633b9e27ba5919ce67f89abbd57cf40bbb184e3010adac012442",
+				"dweb:/ipfs/Qmcpn5dFymHfELoJpj6byNZbqyxFRnJkfWwxEhSPQqUEuT"
+			]
+		},
+		"contracts/REI/libraries/SafeMath.sol": {
+			"keccak256": "0x64f2feb0454b67eaaa32c0c209cdf6f3a24a8b630ae464ff457ca3bfbba67a21",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://a558229575749a391e75d75d5982982a638494d39256b82945d634b6dd0da66b",
+				"dweb:/ipfs/QmW86CE416JtAcCfEh6mjFGtJAJGTGRFS47AJLZqAoKEKf"
+			]
+		},
+		"contracts/REI/libraries/TransferHelper.sol": {
+			"keccak256": "0x7237755a2a96246ba8d054af8aa87a02a1e9f852b7fc9af62e06f0dd33ddc3b2",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://b0488324981f9cd3cce43d3fa06b237ed7009cfeb9290520b3d06c3534248dff",
+				"dweb:/ipfs/QmfVHVQcnaoCDWXBZBfgo2EYstCyNwbtUuUyPRswmy8xc5"
+			]
+		}
+	},
+	"version": 1
+}
