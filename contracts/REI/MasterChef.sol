@@ -6,10 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./OortToken.sol";
 
-interface IMigratorChef {
-    function migrate(IERC20 token) external returns (IERC20);
-}
-
 contract MasterChef is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
@@ -35,8 +31,6 @@ contract MasterChef is Ownable {
     uint256 public oortPerBlock;
     // Bonus muliplier for early oort makers.
     uint256 public BONUS_MULTIPLIER = 1;
-    // The migrator contract. It has a lot of power. Can only be set through governance (owner).
-    IMigratorChef public migrator;
 
     uint256 public halvingPeriod = 5760000;
     uint256 public extraReward = 1750000;
@@ -154,23 +148,6 @@ contract MasterChef is Ownable {
         uint256 prevAllocPoint = poolInfo[_pid].allocPoint;
         totalAllocPoint = totalAllocPoint.sub(prevAllocPoint).add(_allocPoint);
 
-    }
-
-    // Set the migrator contract. Can only be called by the owner.
-    function setMigrator(IMigratorChef _migrator) public onlyOwner {
-        migrator = _migrator;
-    }
-
-    // Migrate lp token to another lp contract. Can be called by anyone. We trust that migrator contract is good.
-    function migrate(uint256 _pid) public {
-        require(address(migrator) != address(0), "migrate: no migrator");
-        PoolInfo storage pool = poolInfo[_pid];
-        IERC20 lpToken = IERC20(pool.lpToken);
-        uint256 bal = lpToken.balanceOf(address(this));
-        lpToken.safeApprove(address(migrator), bal);
-        IERC20 newLpToken = migrator.migrate(lpToken);
-        require(bal == newLpToken.balanceOf(address(this)), "migrate: bad");
-        pool.lpToken = address(newLpToken);
     }
 
     // View function to see pending OORTs on frontend.

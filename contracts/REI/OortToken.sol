@@ -261,16 +261,6 @@ contract OortToken is DelegateERC20, Ownable {
     address public swapPool;
     address public lendPool;
 
-    enum Action {
-      AIRDROP,
-      MARKET,
-      OTHER
-    }
-
-    mapping(address => mapping(Action => bool)) public approvals;
-
-    address[] public requiredSignatories;
-
     modifier onlyChef{
         require(msg.sender == ChefPool,"only ChefPool");
         _;
@@ -286,55 +276,9 @@ contract OortToken is DelegateERC20, Ownable {
         _;
     }
 
-    modifier signatoryOnly() {
-      bool found = false;
-      for (uint256 i = 0; i < requiredSignatories.length; i++) {
-        if (requiredSignatories[i] == msg.sender) {
-          found = true;
-        }
-      }
-      require(found, "Not signatory");
-      _;
-    }
-
-    modifier requireApprovalFor(Action action) {
-      uint256 approvalsCount = 0;
-
-      for (uint256 i = 0; i < requiredSignatories.length; i++) {
-        if(approvals[requiredSignatories[i]][action]) {
-          approvalsCount++;
-        }
-
-        approvals[requiredSignatories[i]][action] = false;
-      }
-
-      require(approvalsCount >= requiredSignatories.length.div(2),"Signatory has not enough approved");
-      _;
-    }
-
-    function approve(Action action) external signatoryOnly {
-      approvals[msg.sender][action] = true;
-    }
-
-    constructor(address _teamTimeLockAddr,address _investorAddr,address[] memory _requiredSignatories) ERC20("Oort Token", "Oort"){
+    constructor(address _teamTimeLockAddr,address _investorAddr) ERC20("Oort Token", "Oort"){
         _mint(_teamTimeLockAddr, teamSupply);
         _mint(_investorAddr,investorSupply);
-        for (uint256 i = 0; i < _requiredSignatories.length; i++) {
-            requiredSignatories.push(_requiredSignatories[i]);
-        }
-    }
-
-    function modifySignatories(address _oldAddress,address _newAddress) public onlyOwner{
-        for (uint256 i = 0; i < requiredSignatories.length; i++) {
-            if(requiredSignatories[i] == _oldAddress) {
-                requiredSignatories[i] = _newAddress;
-                break;
-            }
-        }
-    }
-
-    function addSignatories(address _newAddress) public onlyOwner{
-        requiredSignatories.push(_newAddress);
     }
 
     function setChefAddr(address _chef) public onlyOwner{
@@ -388,20 +332,20 @@ contract OortToken is DelegateERC20, Ownable {
          lendPoolMint = lendPoolMint.add(_amount);
     }
 
-    function AirDropMint(address _dao) public signatoryOnly requireApprovalFor(Action.AIRDROP) {
+    function AirDropMint(address _dao) public onlyOwner {
         _mint(_dao,airdropSupply);
 
         airdropSupply = 0;
     }
 
-    function MarketMint(address _dao,uint256 _amount) public signatoryOnly requireApprovalFor(Action.MARKET) {
+    function MarketMint(address _dao,uint256 _amount) public onlyOwner {
         require(_amount <= opSupply,"_amount < opSupply");
         _mint(_dao,_amount);
 
         opSupply = opSupply.sub(_amount);
     }
 
-    function OtherMint(address _dao,uint256 _amount) public signatoryOnly requireApprovalFor(Action.OTHER) {
+    function OtherMint(address _dao,uint256 _amount) public onlyOwner {
         require(_amount <= daoSupply,"_amount < daoSupply");
         _mint(_dao,_amount);
 

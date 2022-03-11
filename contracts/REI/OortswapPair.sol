@@ -181,7 +181,7 @@ contract OortswapPair is IOortswapPair, OortswapERC20 {
         { // scope for reserve{0,1}Adjusted, avoids stack too deep errors
         uint balance0Adjusted = balance0.mul(10000).sub(amount0In.mul(25));
         uint balance1Adjusted = balance1.mul(10000).sub(amount1In.mul(25));
-        require(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(1000**2), 'Oortswap: K');
+        require(balance0Adjusted.mul(balance1Adjusted) >= uint(_reserve0).mul(_reserve1).mul(10000**2), 'Oortswap: K');
         }
 
         _update(balance0, balance1, _reserve0, _reserve1);
@@ -189,7 +189,8 @@ contract OortswapPair is IOortswapPair, OortswapERC20 {
     }
 
     // force balances to match reserves
-    function skim(address to) external lock {
+    function skim() external lock {
+        address to = IOortswapFactory(factory).feeTo();
         address _token0 = token0; // gas savings
         address _token1 = token1; // gas savings
         _safeTransfer(_token0, to, IERC20(_token0).balanceOf(address(this)).sub(reserve0));

@@ -28,6 +28,8 @@ contract OortRouter is IOortswapRouter ,Ownable {
     address public immutable override WETH;
     address public  swapMining;
 
+    event SetSwapMiningEvent(address newAddress);
+
     modifier ensure(uint deadline) {
         require(deadline >= block.timestamp, 'OortswapV2Router: EXPIRED');
         _;
@@ -40,6 +42,7 @@ contract OortRouter is IOortswapRouter ,Ownable {
 
     function setSwapMining(address _swapMininng) public onlyOwner {
         swapMining = _swapMininng;
+        emit SetSwapMiningEvent(_swapMininng);
     }
 
     receive() external payable {
