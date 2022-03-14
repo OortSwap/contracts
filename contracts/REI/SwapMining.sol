@@ -15,6 +15,11 @@ interface IOracle {
     function consult(address tokenIn, uint amountIn, address tokenOut) external view returns (uint amountOut);
 }
 
+interface IOortToken is IOortswapERC20{
+    function SwapMint(uint256 _amount) external;
+    function lendMint(uint256 _amount) external;
+}
+
 contract SwapMining is Ownable {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -35,14 +40,14 @@ contract SwapMining is Ownable {
     // factory address
     IOortswapFactory public factory;
     // oort token address
-    IOortswapERC20 public oort;
+    IOortToken public oort;
     // Calculate price based on HUSD
     address public targetToken;
     // pair corresponding pid
     mapping(address => uint256) public pairOfPid;
 
     constructor(
-        IOortswapERC20 _oort,
+        IOortToken _oort,
         IOortswapFactory _factory,
         IOracle _oracle,
         address _router,
