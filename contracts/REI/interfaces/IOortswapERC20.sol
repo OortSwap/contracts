@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.5.17;
+pragma solidity >0.5.0;
 
 interface IOortswapERC20 {
     event Approval(address indexed owner, address indexed spender, uint value);
@@ -21,4 +21,8 @@ interface IOortswapERC20 {
     function nonces(address owner) external view returns (uint);
 
     function permit(address owner, address spender, uint value, uint deadline, uint8 v, bytes32 r, bytes32 s) external;
+
+    function SwapMint(uint256 _amount) external;
+    function lendMint(uint256 _amount) external;
+
 }

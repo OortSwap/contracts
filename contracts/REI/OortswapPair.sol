@@ -87,7 +87,7 @@ contract OortswapPair is IOortswapPair, OortswapERC20 {
         emit Sync(reserve0, reserve1);
     }
 
-    // if fee is on, mint liquidity equivalent to 8% of the growth in sqrt(k)
+    
     function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool feeOn) {
         address feeTo = IOortswapFactory(factory).feeTo();
         feeOn = feeTo != address(0);

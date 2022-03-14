@@ -1,47 +1,24 @@
 // SPDX-License-Identifier: MIT
+pragma solidity 0.8.4;
 
-pragma solidity =0.6.12;
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "./interfaces/IERC20.sol";
+import "./libraries/SafeMath.sol";
+import "./interfaces/IOortswapFactory.sol";
+import "./interfaces/IOortswapPair.sol";
+import "./interfaces/IOortswapERC20.sol";
 
-import './libraries/Ownable.sol';
-import './interfaces/IERC20.sol';
-import './libraries/SafeMath.sol';
-import './interfaces/IOortswapRouter.sol';
+interface IOracle {
+    function update(address tokenA, address tokenB) external;
 
-interface IUniswapV2Pair {
-    function token0() external view returns (address);
-    function token1() external view returns (address);
-}
-
-interface IUniswapV2Factory {
-    function feeTo() external view returns (address);
-    function feeToSetter() external view returns (address);
-
-    function getPair(address tokenA, address tokenB) external view returns (address pair);
-    function allPairs(uint) external view returns (address pair);
-    function allPairsLength() external view returns (uint);
-
-    function createPair(address tokenA, address tokenB) external returns (address pair);
-
-    function setFeeTo(address) external;
-    function setFeeToSetter(address) external;
-
-    function pairFor(address tokenA, address tokenB) external view returns (address pair);
-}
-
-interface IProvider {
-    function getMarginPoolStaking() external view  returns (address);
-    function getMarginPool() external view returns (address);
-    function getPriceOracle() external view returns (address);
-}
-
-interface Token {
-    function mint(address _addr,uint256 _amount) external;
-    function transfer(address recipient, uint256 amount) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
+    function consult(address tokenIn, uint amountIn, address tokenOut) external view returns (uint amountOut);
 }
 
 contract SwapMining is Ownable {
     using SafeMath for uint256;
+    using EnumerableSet for EnumerableSet.AddressSet;
+    EnumerableSet.AddressSet private _whitelist;
 
     // oort tokens created per block
     uint256 public oortPerBlock;
@@ -52,60 +29,58 @@ contract SwapMining is Ownable {
     uint256 public extraReward = 1750000;
     // Total allocation points
     uint256 public totalAllocPoint = 0;
-    // IOracle public oracle;
+    IOracle public oracle;
     // router address
     address public router;
     // factory address
-    IUniswapV2Factory public factory;
+    IOortswapFactory public factory;
     // oort token address
-    Token public oort;
-
+    IOortswapERC20 public oort;
+    // Calculate price based on HUSD
+    address public targetToken;
     // pair corresponding pid
     mapping(address => uint256) public pairOfPid;
-    
-    mapping(uint256=>mapping(address=>uint256)) public withdrawAmounts;
-
-    address public staking;
-    
-    
-    event Swap(address indexed user, uint256 indexed pid, uint256 amount);
 
     constructor(
-        Token _oort,
+        IOortswapERC20 _oort,
+        IOortswapFactory _factory,
+        IOracle _oracle,
         address _router,
+        address _targetToken,
         uint256 _oortPerBlock,
-        uint256 _startBlock,
-        address _staking
-    ) public {
+        uint256 _startBlock
+    )  {
         oort = _oort;
-        factory = IUniswapV2Factory(IOortswapRouter(_router).factory());
+        factory = _factory;
+        oracle = _oracle;
         router = _router;
+        targetToken = _targetToken;
         oortPerBlock = _oortPerBlock;
         startBlock = _startBlock;
-        staking = _staking;
     }
 
     struct UserInfo {
-        uint256 amount;     // How many LP tokens the user has provided.
-        uint256 rewardDebt; // Reward debt. See explanation below.
-        uint256 unclaimedBuni;
+        uint256 quantity;       // How many LP tokens the user has provided
+        uint256 blockNumber;    // Last transaction block
     }
 
-    // Info of each pool.
     struct PoolInfo {
-        address pair;           // Address of LP token contract.
-        uint256 allocPoint;       // How many allocation points assigned to this pool. CAKEs to distribute per block.
-        uint256 lastRewardBlock;  // Last block number that CAKEs distribution occurs.
-        uint256 accCakePerShare; // Accumulated CAKEs per share, times 1e12. See below.
-        uint256 amount;
+        address pair;           // Trading pairs that can be mined
+        uint256 quantity;       // Current amount of LPs
+        uint256 totalQuantity;  // All quantity
+        uint256 allocPoint;     // How many allocation points assigned to this pool
+        uint256 allocoortAmount; // How many oorts
+        uint256 lastRewardBlock;// Last transaction block
     }
 
     PoolInfo[] public poolInfo;
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
 
+
     function poolLength() public view returns (uint256) {
         return poolInfo.length;
     }
+
 
     function addPair(uint256 _allocPoint, address _pair, bool _withUpdate) public onlyOwner {
         require(_pair != address(0), "_pair is the zero address");
@@ -114,15 +89,14 @@ contract SwapMining is Ownable {
         }
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
-
         poolInfo.push(PoolInfo({
-            pair: _pair,
-            allocPoint : _allocPoint,
-            lastRewardBlock: lastRewardBlock,
-            accCakePerShare: 0,
-            amount : 0
+        pair : _pair,
+        quantity : 0,
+        totalQuantity : 0,
+        allocPoint : _allocPoint,
+        allocoortAmount : 0,
+        lastRewardBlock : lastRewardBlock
         }));
-
         pairOfPid[_pair] = poolLength() - 1;
     }
 
@@ -141,6 +115,30 @@ contract SwapMining is Ownable {
         oortPerBlock = _newPerBlock;
     }
 
+    // Only tokens in the whitelist can be mined oort
+    function addWhitelist(address _addToken) public onlyOwner returns (bool) {
+        require(_addToken != address(0), "SwapMining: token is the zero address");
+        return EnumerableSet.add(_whitelist, _addToken);
+    }
+
+    function delWhitelist(address _delToken) public onlyOwner returns (bool) {
+        require(_delToken != address(0), "SwapMining: token is the zero address");
+        return EnumerableSet.remove(_whitelist, _delToken);
+    }
+
+    function getWhitelistLength() public view returns (uint256) {
+        return EnumerableSet.length(_whitelist);
+    }
+
+    function isWhitelist(address _token) public view returns (bool) {
+        return EnumerableSet.contains(_whitelist, _token);
+    }
+
+    function getWhitelist(uint256 _index) public view returns (address){
+        require(_index <= getWhitelistLength() - 1, "SwapMining: index out of bounds");
+        return EnumerableSet.at(_whitelist, _index);
+    }
+
     function setHalvingPeriod(uint256 _block) public onlyOwner {
         halvingPeriod = _block;
     }
@@ -148,6 +146,11 @@ contract SwapMining is Ownable {
     function setRouter(address newRouter) public onlyOwner {
         require(newRouter != address(0), "SwapMining: new router is the zero address");
         router = newRouter;
+    }
+
+    function setOracle(IOracle _oracle) public onlyOwner {
+        require(address(_oracle) != address(0), "SwapMining: new oracle is the zero address");
+        oracle = _oracle;
     }
 
     // At what phase
@@ -174,7 +177,6 @@ contract SwapMining is Ownable {
         return reward(block.number);
     }
 
-    // Rewards for the current block
     function getExtraReward(uint256 _from, uint256 _to,uint256 _lastRewardBlock) internal view returns (uint256) {
         require(_to >= _lastRewardBlock, "SwapMining: extra must little than the current block number");
         
@@ -209,10 +211,29 @@ contract SwapMining is Ownable {
     function massMintPools() public {
         uint256 length = poolInfo.length;
         for (uint256 pid = 0; pid < length; ++pid) {
-            updatePool(pid);
+            mint(pid);
         }
     }
 
+    function mint(uint256 _pid) public returns (bool) {
+        PoolInfo storage pool = poolInfo[_pid];
+        if (block.number <= pool.lastRewardBlock) {
+            return false;
+        }
+        uint256 blockReward = getOortReward(pool.lastRewardBlock);
+        if (blockReward <= 0) {
+            return false;
+        }
+        // Calculate the rewards obtained by the pool based on the allocPoint
+        uint256 oortReward = blockReward.mul(pool.allocPoint).div(totalAllocPoint);
+        oort.SwapMint(oortReward);
+        // Increase the number of tokens in the current pool
+        pool.allocoortAmount = pool.allocoortAmount.add(oortReward);
+        pool.lastRewardBlock = block.number;
+        return true;
+    }
+
+    // swapMining only router
     function swap(address account, address input, address output, uint256 amount) public onlyRouter returns (bool) {
         require(account != address(0), "SwapMining: taker swap account is the zero address");
         require(input != address(0), "SwapMining: taker swap input is the zero address");
@@ -222,10 +243,11 @@ contract SwapMining is Ownable {
             return false;
         }
 
-        address pair = factory.getPair(input, output);
-        if(pair ==address(0x00)) {
+        if (!isWhitelist(input) || !isWhitelist(output)) {
             return false;
         }
+
+        address pair = IOortswapFactory(factory).pairFor(input, output);
 
         PoolInfo storage pool = poolInfo[pairOfPid[pair]];
         // If it does not exist or the allocPoint is 0 then return
@@ -233,98 +255,72 @@ contract SwapMining is Ownable {
             return false;
         }
 
-        uint256 _pid = pairOfPid[pair];
-        UserInfo storage user = userInfo[_pid][account];
-        updatePool(_pid);
-
-        if (user.amount > 0) {
-            uint256 pending = user.amount.mul(pool.accCakePerShare).div(1e12).sub(user.rewardDebt);
-            if(pending > 0) {
-                user.unclaimedBuni = user.unclaimedBuni.add(pending);
-            }
+        uint256 quantity = getQuantity(output, amount, targetToken);
+        if (quantity <= 0) {
+            return false;
         }
 
-        if(amount > 0){
-            user.amount = user.amount.add(amount);
-            pool.amount = pool.amount.add(amount);
-            
-            emit Swap(account, _pid, amount);
-        }
+        mint(pairOfPid[pair]);
 
-        user.rewardDebt = user.amount.mul(pool.accCakePerShare).div(1e12);
-        
+        pool.quantity = pool.quantity.add(quantity);
+        pool.totalQuantity = pool.totalQuantity.add(quantity);
+        UserInfo storage user = userInfo[pairOfPid[pair]][account];
+        user.quantity = user.quantity.add(quantity);
+        user.blockNumber = block.number;
         return true;
     }
 
     // The user withdraws all the transaction rewards of the pool
-    function takerWithdraw(address _addr) public onlyStaking {
+    function takerWithdraw() public {
         uint256 userSub;
         uint256 length = poolInfo.length;
         for (uint256 pid = 0; pid < length; ++pid) {
             PoolInfo storage pool = poolInfo[pid];
-            UserInfo storage user = userInfo[pid][_addr];
-            updatePool(pid);
-
-            if (user.amount > 0) {
-                uint256 pending = user.amount.mul(pool.accCakePerShare).div(1e12).sub(user.rewardDebt);
-                uint256 userReward = pending.add(user.unclaimedBuni);
-
-                user.rewardDebt = user.amount.mul(pool.accCakePerShare).div(1e12);
-
-                if(userReward > 0) {
-                    user.unclaimedBuni = 0;
-                    pool.amount = pool.amount.sub(user.amount);
-                    user.amount = 0;
-                    
-                    userSub = userSub.add(userReward);
-                    
-                    withdrawAmounts[pid][_addr] = withdrawAmounts[pid][_addr].add(userReward);
-                }
+            UserInfo storage user = userInfo[pid][msg.sender];
+            if (user.quantity > 0) {
+                mint(pid);
+                // The reward held by the user in this pool
+                uint256 userReward = pool.allocoortAmount.mul(user.quantity).div(pool.quantity);
+                pool.quantity = pool.quantity.sub(user.quantity);
+                pool.allocoortAmount = pool.allocoortAmount.sub(userReward);
+                user.quantity = 0;
+                user.blockNumber = block.number;
+                userSub = userSub.add(userReward);
             }
-
-            user.rewardDebt = user.amount.mul(pool.accCakePerShare).div(1e12);
         }
-
         if (userSub <= 0) {
             return;
         }
-        
-        safeCakeTransfer(_addr, userSub);
-    }
-    
-    function updatePool(uint256 _pid) public {
-        PoolInfo storage pool = poolInfo[_pid];
-        if (block.number <= pool.lastRewardBlock) {
-            return;
-        }
-
-        uint256 reserveSupply = pool.amount;   // 本池子占有的LP数量
-        if (reserveSupply == 0) {
-            pool.lastRewardBlock = block.number;
-            return;
-        }
-        uint256 blockReward = getOortReward(pool.lastRewardBlock);
-        uint256 sushiReward = blockReward.mul(pool.allocPoint).div(totalAllocPoint);   // 计算本池子可获得的新的sushi激励
-        oort.mint(address(this), sushiReward);     // 将挖出的sushi给此合约
-        pool.accCakePerShare = pool.accCakePerShare.add(sushiReward.mul(1e12).div(reserveSupply));  // 计算每个lp可分到的sushi数量
-        pool.lastRewardBlock = block.number;        // 记录最新的计算过的区块高度
+        oort.transfer(msg.sender, userSub);
     }
 
-    function getUserReward(uint256 _pid, address _user) external view returns (uint256,uint256) {
-        require(_pid <= poolInfo.length - 1, "marginMining: Not find this pool");
-        PoolInfo storage pool = poolInfo[_pid];
-        UserInfo storage user = userInfo[_pid][_user];
-        uint256 accCakePerShare = pool.accCakePerShare;
-        uint256 reserveSupply = pool.amount;
-        if (block.number > pool.lastRewardBlock && reserveSupply != 0) {
+    // Get rewards from users in the current pool
+    function getUserReward(uint256 _pid) public view returns (uint256, uint256){
+        require(_pid <= poolInfo.length - 1, "SwapMining: Not find this pool");
+        uint256 userSub;
+        PoolInfo memory pool = poolInfo[_pid];
+        UserInfo memory user = userInfo[_pid][msg.sender];
+        if (user.quantity > 0) {
             uint256 blockReward = getOortReward(pool.lastRewardBlock);
-            uint256 cakeReward = blockReward.mul(pool.allocPoint).div(totalAllocPoint);
-            accCakePerShare = accCakePerShare.add(cakeReward.mul(1e12).div(reserveSupply));
+            uint256 oortReward = blockReward.mul(pool.allocPoint).div(totalAllocPoint);
+            userSub = userSub.add((pool.allocoortAmount.add(oortReward)).mul(user.quantity).div(pool.quantity));
         }
-        
-        uint256 userReward = user.amount.mul(accCakePerShare).div(1e12).sub(user.rewardDebt).add(user.unclaimedBuni);
+        //oort available to users, User transaction amount
+        return (userSub, user.quantity);
+    }
 
-        return (userReward,userReward.add(withdrawAmounts[_pid][_user]));
+    // Get details of the pool
+    function getPoolInfo(uint256 _pid) public view returns (address, address, uint256, uint256, uint256, uint256){
+        require(_pid <= poolInfo.length - 1, "SwapMining: Not find this pool");
+        PoolInfo memory pool = poolInfo[_pid];
+        address token0 = IOortswapPair(pool.pair).token0();
+        address token1 = IOortswapPair(pool.pair).token1();
+        uint256 oortAmount = pool.allocoortAmount;
+        uint256 blockReward = getOortReward(pool.lastRewardBlock);
+        uint256 oortReward = blockReward.mul(pool.allocPoint).div(totalAllocPoint);
+        oortAmount = oortAmount.add(oortReward);
+        //token0,token1,Pool remaining reward,Total /Current transaction volume of the pool
+        return (token0, token1, oortAmount, pool.totalQuantity, pool.quantity, pool.allocPoint);
     }
 
     modifier onlyRouter() {
@@ -332,18 +328,25 @@ contract SwapMining is Ownable {
         _;
     }
 
-    modifier onlyStaking {
-        require(_msgSender() == staking, "onlyStaking getMarginPoolStaking");
-        _;
-   }
-
-   function safeCakeTransfer(address _to, uint256 _amount) internal {
-        uint256 oortBal = oort.balanceOf(address(this));
-        if (_amount > oortBal) {
-            oort.transfer(_to, oortBal);
+    function getQuantity(address outputToken, uint256 outputAmount, address anchorToken) public view returns (uint256) {
+        uint256 quantity = 0;
+        if (outputToken == anchorToken) {
+            quantity = outputAmount;
+        } else if (IOortswapFactory(factory).getPair(outputToken, anchorToken) != address(0)) {
+            quantity = IOracle(oracle).consult(outputToken, outputAmount, anchorToken);
         } else {
-            oort.transfer(_to, _amount);
+            uint256 length = getWhitelistLength();
+            for (uint256 index = 0; index < length; index++) {
+                address intermediate = getWhitelist(index);
+                if (IOortswapFactory(factory).getPair(outputToken, intermediate) != address(0) && IOortswapFactory(factory).getPair(intermediate, anchorToken) != address(0)) {
+                    uint256 interQuantity = IOracle(oracle).consult(outputToken, outputAmount, intermediate);
+                    quantity = IOracle(oracle).consult(intermediate, interQuantity, anchorToken);
+                    break;
+                }
+            }
         }
+
+        return quantity;
     }
 
 }

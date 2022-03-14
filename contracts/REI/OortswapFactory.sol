@@ -48,4 +48,21 @@ contract OortswapFactory is IOortswapFactory {
         require(msg.sender == feeToSetter, 'Oortswap: FORBIDDEN');
         feeToSetter = _feeToSetter;
     }
+
+    function sortTokens(address tokenA, address tokenB) public pure returns (address token0, address token1) {
+        require(tokenA != tokenB, 'OortSwapFactory: IDENTICAL_ADDRESSES');
+        (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+        require(token0 != address(0), 'OortSwapFactory: ZERO_ADDRESS');
+    }
+
+    // calculates the CREATE2 address for a pair without making any external calls
+    function pairFor(address tokenA, address tokenB) public view returns (address pair) {
+        (address token0, address token1) = sortTokens(tokenA, tokenB);
+        pair = address(uint(keccak256(abi.encodePacked(
+                hex'ff',
+                address(this),
+                keccak256(abi.encodePacked(token0, token1)),
+                INIT_CODE_PAIR_HASH
+            ))));
+    }
 }
